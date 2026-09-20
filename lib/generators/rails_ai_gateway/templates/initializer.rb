@@ -1,4 +1,4 @@
-RailsAiGateway.configure do |config|
+RailsAIGateway.configure do |config|
   # Deny by default. With Devise, for example:
   # config.admin_controller = "ApplicationController"
   # config.admin_authorization = ->(controller) { controller.current_user&.admin? == true }

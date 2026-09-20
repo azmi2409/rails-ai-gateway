@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 - 2026-09-20
+
+- Add durable input/output token totals grouped by public model.
+- Add per-route system prompt injection without prompt logging.
+- Add `RailsAIGateway::ENDPOINT`, `AI` inflection, and `RailsAIGateway` namespace alias.
+- Add one-key templates for popular OpenAI-compatible providers.
+- Add model capability metadata to routes, admin UI, and `/v1/models`.
+- Add provider logos, modal connection flow, and deterministic keyword query routing.
+- Add `models`, `model`, and `route_for` helpers for host Rails code.
+
 ## 0.2.0 - 2026-09-20
 
 - Redesign admin UI as a responsive AI gateway operations console.

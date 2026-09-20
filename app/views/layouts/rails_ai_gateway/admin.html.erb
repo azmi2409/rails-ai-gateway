@@ -8,6 +8,7 @@
     <%= csrf_meta_tags %>
     <%= tag.link rel: "icon", href: favicon_path, type: "image/webp" %>
     <%= stylesheet_link_tag style_path %>
+    <%= javascript_include_tag script_path, defer: true %>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>

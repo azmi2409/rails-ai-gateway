@@ -1,4 +1,4 @@
-class CreateRailsAiGateway < ActiveRecord::Migration[8.0]
+class CreateRailsAIGateway < ActiveRecord::Migration[8.0]
   def change
     create_table :rails_ai_gateway_providers do |t|
       t.string :name, null: false

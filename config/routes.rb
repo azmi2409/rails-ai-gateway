@@ -15,4 +15,6 @@ RailsAiGateway::Engine.routes.draw do
   get "admin/style", to: "admin#style", as: :style
   get "admin/logo", to: "admin#logo", as: :logo
   get "admin/favicon", to: "admin#favicon", as: :favicon
+  get "admin/script", to: "admin#script", as: :script
+  get "admin/providers/:template/logo", to: "admin#provider_logo", as: :provider_logo
 end

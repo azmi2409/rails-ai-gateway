@@ -15,6 +15,11 @@ metadata with ActiveRecord, and includes a Web UI for providers, model routes, a
 - Encrypted provider API keys using ActiveRecord encryption
 - Scoped gateway keys stored as SHA-256 digests
 - Request status, latency, attempt, and reported token-usage logs
+- Durable input/output token totals grouped by public model
+- Optional system prompt injection configured per model route
+- One-key provider templates for OpenAI, OpenRouter, Groq, DeepSeek, Mistral, Cerebras,
+  Nebius AI, and Perplexity
+- Explicit model capabilities exposed through UI and `/v1/models`
 - Configurable timeouts, body limits, fallback attempts, and network policy
 - SSRF protection with DNS validation and address pinning
 - Server-rendered, responsive, accessible admin UI
@@ -54,6 +59,9 @@ Web UI guides initial setup:
 2. Add public model route, such as `fast-chat` mapped to `gpt-5.6-luna`.
 3. Create gateway key and save token when shown. Raw token cannot be displayed again.
 
+Popular provider templates need only API key. Custom OpenAI-compatible provider form remains
+available for self-hosted and less common endpoints.
+
 Routes with same public model name form fallback chain. Lower priority runs first. Gateway
 retries connection failures before upstream accepts request and HTTP `429`, `500`, `502`,
 `503`, or `504`. Ambiguous timeouts and started streams are never retried.
@@ -63,7 +71,7 @@ retries connection failures before upstream accepts request and HTTP `429`, `500
 Runtime and security policy live in `config/initializers/rails_ai_gateway.rb`:
 
 ```ruby
-RailsAiGateway.configure do |config|
+RailsAIGateway.configure do |config|
   config.admin_controller = "ApplicationController"
   config.admin_authorization = ->(controller) {
     controller.current_user&.admin? == true
@@ -82,6 +90,16 @@ RailsAiGateway.configure do |config|
 end
 ```
 
+Rails acronym inflection exposes `RailsAIGateway` as the preferred constant while keeping
+`RailsAiGateway` compatible. Use the endpoint constant instead of repeating a URL path:
+
+```ruby
+OpenAI::Client.new(uri_base: "#{ENV.fetch("APP_URL")}#{RailsAIGateway::ENDPOINT}")
+```
+
+`RailsAIGateway::ENDPOINT` is `/ai/v1`, matching the generator's default mount. If host app
+changes mount path, build endpoint from that route instead.
+
 Admin requests are denied until `admin_authorization` returns exactly `true`. Provider
 definitions, model routes, gateway keys, and logs stay database-backed and editable through
 Web UI.
@@ -89,7 +107,7 @@ Web UI.
 Need another mount path? Change host route:
 
 ```ruby
-mount RailsAiGateway::Engine, at: "/gateway"
+mount RailsAIGateway::Engine, at: "/gateway"
 ```
 
 ## Make Requests
@@ -108,6 +126,27 @@ Available endpoints:
 - `POST /ai/v1/embeddings`
 
 OpenAI clients can use `http://localhost:3000/ai/v1` as base URL.
+
+Each model route can prepend an optional system message to chat requests. Injected prompts
+are stored on route and are never copied into request logs. Token dashboards use only usage
+reported by upstream providers; missing usage remains zero rather than being estimated.
+Routes declare capabilities from `text`, `vision`, `embedding`, `audio`, `video`, `tools`,
+and `reasoning`; clients receive merged capabilities in each `/v1/models` entry. Capability
+metadata does not add unsupported transport endpoints by itself.
+
+Host Rails code can inspect active models without making an HTTP request:
+
+```ruby
+RailsAIGateway.models
+RailsAIGateway.models(capabilities: %w[vision tools])
+RailsAIGateway.models(provider: "OpenAI")
+RailsAIGateway.model("fast-chat")
+RailsAIGateway.route_for(model: "fast-chat", query: "Review this Ruby code")
+```
+
+Helpers return provider names and routing metadata, never provider API keys. `route_for`
+uses same literal keyword ranking as proxy: matching specialized routes first, then generic
+fallback routes.
 
 ## Development
 

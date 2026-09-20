@@ -65,12 +65,13 @@ module RailsAiGateway
 
       if @endpoint == "models"
         names = ModelRoute.available.distinct.pluck(:name).select { |name| key.allows?(name) }.sort
-        return json(200, object: "list", data: names.map { |name| { id: name, object: "model", created: 0, owned_by: "rails_ai_gateway" } })
+        capabilities = ModelRoute.available.where(name: names).group_by(&:name).transform_values { |routes| routes.flat_map(&:capabilities).uniq }
+        return json(200, object: "list", data: names.map { |name| { id: name, object: "model", created: 0, owned_by: "rails_ai_gateway", capabilities: capabilities.fetch(name, []) } })
       end
 
       payload = parse_request(request)
       return error("Model is not allowed", 403) unless key.allows?(payload["model"])
-      routes = ModelRoute.available.where(name: payload["model"]).includes(:provider).order(:priority).limit(config.max_attempts).to_a
+      routes = ModelRoute.ranked_for_query(name: payload["model"], query: query_text(payload)).first(config.max_attempts)
       return error("No route for requested model", 404) if routes.empty?
 
       log = RequestLog.create!(request_id: SecureRandom.uuid, gateway_key: key, model: payload["model"], endpoint: @endpoint)
@@ -119,6 +120,22 @@ module RailsAiGateway
       payload
     end
 
+    def query_text(payload)
+      if @endpoint == "chat/completions"
+        payload["messages"].select { |message| message["role"] == "user" }.flat_map { |message| text_content(message["content"]) }.join(" ").downcase
+      else
+        Array(payload["input"]).flatten.select { |value| value.is_a?(String) }.join(" ").downcase
+      end
+    end
+
+    def text_content(content)
+      case content
+      when String then [content]
+      when Array then content.filter_map { |part| part["text"] if part.is_a?(Hash) && part["type"] == "text" }
+      else []
+      end
+    end
+
     def stream_response(routes, payload, log_id, request_id)
       ready, chunks = Queue.new, SizedQueue.new(4)
       thread = Thread.new do
@@ -126,10 +143,26 @@ module RailsAiGateway
         Rails.application.executor.wrap do
           sent_headers = false
           begin
-            result = perform(routes, payload, log_id, request_id) do |headers, response|
+            result = perform(routes, payload, log_id, request_id) do |headers, response, report_usage|
               sent_headers = true
               ready << [response.code.to_i, headers]
-              response.read_body { |chunk| chunks << chunk }
+              event_buffer = +""
+              response.read_body do |chunk|
+                event_buffer << chunk
+                while (boundary = event_buffer.index("\n\n"))
+                  event = event_buffer.slice!(0, boundary + 2)
+                  event.each_line do |line|
+                    next unless line.start_with?("data: ")
+                    data = line.delete_prefix("data: ").strip
+                    next if data == "[DONE]"
+                    parsed = JSON.parse(data)
+                    report_usage.call(normalize_usage(parsed["usage"])) if parsed.is_a?(Hash) && parsed["usage"].is_a?(Hash)
+                  rescue JSON::ParserError
+                    nil
+                  end
+                end
+                chunks << chunk
+              end
             end
             if sent_headers && result.first >= 400
               chunks << "data: #{JSON.generate(error_payload("Upstream stream failed", result.first))}\n\ndata: [DONE]\n\n"
@@ -174,7 +207,11 @@ module RailsAiGateway
             request["Accept"] = payload["stream"] ? "text/event-stream" : "application/json"
             request["Accept-Encoding"] = "identity"
             request["Authorization"] = "Bearer #{route.provider.api_key}" if route.provider.api_key.present?
-            request.body = JSON.generate(payload.merge("model" => route.upstream_model))
+            upstream_payload = payload.merge("model" => route.upstream_model)
+            if @endpoint == "chat/completions" && route.system_prompt.present?
+              upstream_payload = upstream_payload.merge("messages" => [{ "role" => "system", "content" => route.system_prompt }] + payload["messages"])
+            end
+            request.body = JSON.generate(upstream_payload)
             result = nil
             http.start do
               http.request(request) do |response|
@@ -187,7 +224,7 @@ module RailsAiGateway
                   raise Failure, "Upstream did not return an event stream" unless response["content-type"].to_s.split(";").first == "text/event-stream"
                   headers.merge!("content-type" => "text/event-stream", "x-accel-buffering" => "no")
                   streaming = true
-                  yield headers, response
+                  yield headers, response, ->(reported_usage) { usage = reported_usage if reported_usage }
                   result = [status, headers, []]
                 else
                   body = +""
@@ -202,7 +239,7 @@ module RailsAiGateway
                       raise Failure, "Upstream did not return JSON"
                     end
                     raise Failure, "Upstream did not return a JSON object" unless parsed.is_a?(Hash)
-                    usage = parsed["usage"].slice("prompt_tokens", "completion_tokens", "total_tokens").select { |_, value| value.is_a?(Integer) && value >= 0 } if parsed["usage"].is_a?(Hash)
+                    usage = normalize_usage(parsed["usage"]) if parsed["usage"].is_a?(Hash)
                     if (200..299).cover?(status)
                       raise Failure, "Upstream embeddings response is malformed" if @endpoint == "embeddings" && !parsed["data"].is_a?(Array)
                       result = [status, headers, [body]]
@@ -231,7 +268,14 @@ module RailsAiGateway
       duration = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
       begin
         RequestLog.connection_pool.with_connection do
-          RequestLog.find(log_id).update!(status: status, duration_ms: duration, attempts: attempts, usage: usage)
+          RequestLog.find(log_id).update!(
+            status: status,
+            duration_ms: duration,
+            attempts: attempts,
+            usage: usage,
+            input_tokens: usage&.fetch("input_tokens", 0) || 0,
+            output_tokens: usage&.fetch("output_tokens", 0) || 0
+          )
         end
       rescue StandardError => exception
         Rails.logger.error("RailsAiGateway request log write failed: #{exception.class}")
@@ -251,6 +295,18 @@ module RailsAiGateway
         end
       end
       [uri, addresses.first]
+    end
+
+    def normalize_usage(usage)
+      input = usage["input_tokens"] || usage["prompt_tokens"]
+      output = usage["output_tokens"] || usage["completion_tokens"]
+      return unless input.is_a?(Integer) && input >= 0 && output.is_a?(Integer) && output >= 0
+
+      {
+        "input_tokens" => input,
+        "output_tokens" => output,
+        "total_tokens" => usage["total_tokens"].is_a?(Integer) ? usage["total_tokens"] : input + output
+      }
     end
 
     def error(message, status, request_id = nil)

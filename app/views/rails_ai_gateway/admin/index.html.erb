@@ -34,6 +34,34 @@
   </div>
 </div>
 
+<section class="panel-section usage-panel" aria-labelledby="usage-heading">
+  <div class="section-header">
+    <div>
+      <h2 class="section-title" id="usage-heading">Token Usage by Model</h2>
+      <p class="section-desc">All-time totals reported by upstream providers. Missing usage is recorded as zero, never estimated.</p>
+    </div>
+  </div>
+  <div class="table-container">
+    <table class="data-table">
+      <thead><tr><th scope="col">Public Model</th><th scope="col">Input Tokens</th><th scope="col">Output Tokens</th><th scope="col">Total Tokens</th></tr></thead>
+      <tbody>
+        <% if @model_usage.empty? %>
+          <tr><td data-label="Model" colspan="4" class="empty-state">No token usage reported yet.</td></tr>
+        <% else %>
+          <% @model_usage.each do |model, input_tokens, output_tokens| %>
+            <tr>
+              <td data-label="Model"><code><%= model %></code></td>
+              <td data-label="Input"><%= number_with_delimiter(input_tokens) %></td>
+              <td data-label="Output"><%= number_with_delimiter(output_tokens) %></td>
+              <td data-label="Total"><strong><%= number_with_delimiter(input_tokens + output_tokens) %></strong></td>
+            </tr>
+          <% end %>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <section id="providers" class="panel-section">
   <div class="section-header">
     <div>
@@ -41,6 +69,38 @@
       <p class="section-desc">OpenAI-compatible endpoints. Provider credentials are encrypted at rest with ActiveRecord Encryption.</p>
     </div>
   </div>
+
+  <div class="provider-catalog" aria-label="Provider templates">
+    <% @provider_templates.each do |template_id, template| %>
+      <% connected = @providers.any? { |provider| provider.base_url == template[:base_url] } %>
+      <div class="provider-template <%= "template-connected" if connected %>">
+        <button type="button" class="provider-template-button" <%= "disabled" if connected %> data-provider-connect data-template="<%= template_id %>" data-provider-name="<%= template[:name] %>" data-logo="<%= provider_logo_path(template: template_id) %>">
+          <%= image_tag provider_logo_path(template: template_id), class: "provider-logo", alt: "#{template[:name]} logo", width: 38, height: 38 %>
+          <span class="provider-template-copy"><strong><%= template[:name] %></strong><small><%= connected ? "Connected" : "Add API key to connect" %></small></span>
+          <span class="template-state"><%= connected ? "Configured" : "+ Connect" %></span>
+        </button>
+      </div>
+    <% end %>
+  </div>
+
+  <dialog id="provider-connect-dialog" class="connect-dialog" aria-labelledby="connect-dialog-title">
+    <%= form_with url: providers_path, method: :post, local: true, class: "connect-dialog-card" do |form| %>
+      <div class="connect-dialog-header">
+        <img data-dialog-logo alt="" width="44" height="44" class="provider-logo">
+        <div><span class="dialog-eyebrow">Provider connection</span><h3 id="connect-dialog-title">Connect provider</h3></div>
+        <button type="button" class="dialog-close" data-dialog-close aria-label="Close provider connection">×</button>
+      </div>
+      <p class="dialog-copy">Credential is encrypted with ActiveRecord Encryption. It is never returned by the admin UI.</p>
+      <%= hidden_field_tag :template, "", data: { dialog_template: true } %>
+      <div class="form-group">
+        <%= label_tag :api_key, "API Key", data: { dialog_key_label: true } %>
+        <%= password_field_tag :api_key, nil, required: true, autocomplete: "new-password", placeholder: "Paste provider API key", data: { dialog_api_key: true } %>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn btn-secondary" data-dialog-close>Cancel</button><%= form.submit "Connect Provider", class: "btn btn-primary", data: { dialog_submit: true } %></div>
+    <% end %>
+  </dialog>
+
+  <h3 class="subsection-title">Configured Providers</h3>
 
   <div class="items-list">
     <% @providers.each do |provider| %>
@@ -131,6 +191,7 @@
           <div class="item-info">
             <span class="item-name"><%= route.name %></span>
             <span class="item-sub">maps to <code><%= route.upstream_model %></code> via <%= route.provider.name %></span>
+            <span class="capability-list"><% route.capabilities.each do |capability| %><span><%= capability %></span><% end %></span>
           </div>
           <div class="item-actions">
             <span class="priority-tag">Priority <%= route.priority %></span>
@@ -154,6 +215,24 @@
               <%= form.label :priority, "Fallback Priority" %>
               <%= form.number_field :priority, value: route.priority, min: 0, required: true %>
             </div>
+            <div class="form-group form-group-wide">
+              <%= form.label :system_prompt, "Injected System Prompt (optional)" %>
+              <%= form.text_area :system_prompt, value: route.system_prompt, rows: 5, maxlength: 20_000, placeholder: "Applied before client messages when this route is selected." %>
+              <small class="field-hint">Stored with this route. Never written to request logs.</small>
+            </div>
+            <div class="form-group form-group-wide">
+              <%= form.label :query_keywords, "Query Router Keywords (optional)" %>
+              <%= form.text_area :query_keywords, value: route.query_keywords.join(", "), rows: 2, maxlength: 5_000, placeholder: "code review, ruby, debugging" %>
+              <small class="field-hint">Comma or line-separated literal matches. Matching routes run before generic fallbacks.</small>
+            </div>
+            <fieldset class="capability-fieldset form-group-wide">
+              <legend>Model Capabilities</legend>
+              <div class="capability-options">
+                <% RailsAiGateway::ModelRoute::CAPABILITIES.each do |capability| %>
+                  <label><%= check_box_tag "model_route[capabilities][]", capability, route.capabilities.include?(capability), id: "route_#{route.id}_capability_#{capability}" %><span><%= capability.capitalize %></span></label>
+                <% end %>
+              </div>
+            </fieldset>
             <div class="form-submit flex-between">
               <%= form.submit "Save Route", class: "btn btn-primary" %>
               <%= button_to "Delete Route", model_route_path(route), method: :delete, class: "btn btn-danger-outline", data: { confirm: "Delete this route?" } %>
@@ -188,6 +267,24 @@
             <%= form.label :priority, "Priority (0 = primary, 1+ = fallback)" %>
             <%= form.number_field :priority, value: 0, min: 0, required: true %>
           </div>
+          <div class="form-group form-group-wide">
+            <%= form.label :system_prompt, "Injected System Prompt (optional)" %>
+            <%= form.text_area :system_prompt, rows: 5, maxlength: 20_000, placeholder: "Applied before client messages when this route is selected." %>
+            <small class="field-hint">Stored with this route. Never written to request logs.</small>
+          </div>
+          <div class="form-group form-group-wide">
+            <%= form.label :query_keywords, "Query Router Keywords (optional)" %>
+            <%= form.text_area :query_keywords, rows: 2, maxlength: 5_000, placeholder: "code review, ruby, debugging" %>
+            <small class="field-hint">Comma or line-separated literal matches. Matching routes run before generic fallbacks.</small>
+          </div>
+          <fieldset class="capability-fieldset form-group-wide">
+            <legend>Model Capabilities</legend>
+            <div class="capability-options">
+              <% RailsAiGateway::ModelRoute::CAPABILITIES.each do |capability| %>
+                <label><%= check_box_tag "model_route[capabilities][]", capability, capability == "text", id: "new_route_capability_#{capability}" %><span><%= capability.capitalize %></span></label>
+              <% end %>
+            </div>
+          </fieldset>
           <div class="form-submit">
             <%= form.submit "Create Route", class: "btn btn-primary", disabled: @providers.empty? %>
           </div>
