@@ -7,7 +7,7 @@ module RailsAiGateway
 
     def install
       template "initializer.rb", "config/initializers/rails_ai_gateway.rb"
-      rake "rails_ai_gateway:install:migrations"
+      rake "railties:install:migrations"
       route 'mount RailsAiGateway::Engine, at: "/ai"'
       say "Configure admin_authorization and ActiveRecord encryption, then run bin/rails db:migrate."
     end
