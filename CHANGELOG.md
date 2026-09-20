@@ -11,7 +11,7 @@
 - Add `models`, `model`, and `route_for` helpers for host Rails code.
 - Use same-origin referrer policy so browser form submissions pass Rails CSRF origin checks.
 - Add safe delete actions for providers and model routes in admin console.
-- Use Nebius Token Factory US North 1 API endpoint in provider template.
+- Use Nebius Token Factory API endpoint in provider template.
 
 ## 0.2.0 - 2026-09-20
 
