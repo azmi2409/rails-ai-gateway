@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
   }
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.3"
-  spec.files = Dir["{app,config,db,lib}/**/*", "README.md", "CHANGELOG.md", "LICENSE"].select { |path| File.file?(path) }
+  spec.files = Dir["{app,config,db,lib}/**/*", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE"].select { |path| File.file?(path) }
   spec.add_dependency "railties", ">= 8.0", "< 9"
   spec.add_dependency "activerecord", ">= 8.0", "< 9"
   spec.add_dependency "actionpack", ">= 8.0", "< 9"

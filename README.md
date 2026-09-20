@@ -1,20 +1,35 @@
 # Rails AI Gateway
 
-Mountable Rails engine providing an OpenAI-compatible AI gateway, ActiveRecord persistence, ordered fallbacks, streaming, encrypted provider credentials, request logs, and an admin UI.
+[![Gem Version](https://badge.fury.io/rb/rails-ai-gateway.svg)](https://rubygems.org/gems/rails-ai-gateway)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Requirements
+Put one OpenAI-compatible endpoint in front of your AI providers without running another
+service. Rails AI Gateway mounts inside your Rails app, stores configuration and request
+metadata with ActiveRecord, and includes a Web UI for providers, model routes, and keys.
 
-- Ruby 3.3 or newer
-- Rails 8.0 or newer
-- SQLite or PostgreSQL
-- ActiveRecord encryption configured by host application
+## What You Get
 
-## Install
+- OpenAI-compatible chat completions, embeddings, and model-list endpoints
+- Streaming chat completions over server-sent events
+- Public model aliases with ordered provider fallbacks
+- Encrypted provider API keys using ActiveRecord encryption
+- Scoped gateway keys stored as SHA-256 digests
+- Request status, latency, attempt, and reported token-usage logs
+- Configurable timeouts, body limits, fallback attempts, and network policy
+- SSRF protection with DNS validation and address pinning
+- Server-rendered, responsive, accessible admin UI
+- SQLite and PostgreSQL support through host Rails database
+- No prompts or responses persisted
+
+## Get Started
+
+Add gem:
 
 ```ruby
-# Gemfile
 gem "rails-ai-gateway"
 ```
+
+Set it up:
 
 ```bash
 bundle install
@@ -22,22 +37,37 @@ bin/rails generate rails_ai_gateway:install
 bin/rails db:migrate
 ```
 
-Generator mounts engine at `/ai`. Change mount path in `config/routes.rb` when needed:
+Generator creates `config/initializers/rails_ai_gateway.rb`, copies migrations, and mounts
+engine at `/ai`. Configure admin authorization, restart Rails, then visit:
 
-```ruby
-mount RailsAiGateway::Engine, at: "/gateway"
-```
+<http://localhost:3000/ai/admin>
 
-Host app must configure [ActiveRecord encryption](https://guides.rubyonrails.org/active_record_encryption.html). Provider API keys use encrypted columns.
+Host app must configure
+[ActiveRecord encryption](https://guides.rubyonrails.org/active_record_encryption.html).
+Provider API keys cannot be saved without it.
+
+## Configure Gateway
+
+Web UI guides initial setup:
+
+1. Add provider with full API base URL, such as `https://api.openai.com/v1`.
+2. Add public model route, such as `fast-chat` mapped to `gpt-4o-mini`.
+3. Create gateway key and save token when shown. Raw token cannot be displayed again.
+
+Routes with same public model name form fallback chain. Lower priority runs first. Gateway
+retries connection failures before upstream accepts request and HTTP `429`, `500`, `502`,
+`503`, or `504`. Ambiguous timeouts and started streams are never retried.
 
 ## Initializer
 
-`config/initializers/rails_ai_gateway.rb` controls runtime and security policy:
+Runtime and security policy live in `config/initializers/rails_ai_gateway.rb`:
 
 ```ruby
 RailsAiGateway.configure do |config|
   config.admin_controller = "ApplicationController"
-  config.admin_authorization = ->(controller) { controller.current_user&.admin? == true }
+  config.admin_authorization = ->(controller) {
+    controller.current_user&.admin? == true
+  }
 
   config.open_timeout = 5
   config.read_timeout = 60
@@ -52,21 +82,17 @@ RailsAiGateway.configure do |config|
 end
 ```
 
-Admin access denies every request until `admin_authorization` returns exactly `true`. Keep `allow_private_networks` and `allow_http` disabled for public providers. Enable both only for trusted internal endpoints such as local Ollama.
+Admin requests are denied until `admin_authorization` returns exactly `true`. Provider
+definitions, model routes, gateway keys, and logs stay database-backed and editable through
+Web UI.
 
-Provider definitions, model routes, gateway keys, and request logs remain database-backed and editable through UI.
+Need another mount path? Change host route:
 
-## Configure
+```ruby
+mount RailsAiGateway::Engine, at: "/gateway"
+```
 
-Open `/ai/admin` and create:
-
-1. Provider with API base URL, such as `https://api.openai.com/v1`.
-2. Public model route mapping to provider model, such as `fast-chat` to `gpt-4o-mini`.
-3. Gateway key. Token appears once; only SHA-256 digest remains stored.
-
-Routes sharing public model name form fallback chain ordered by priority. Gateway retries only connection failures before upstream accepts request and HTTP `429`, `500`, `502`, `503`, or `504`. It never retries ambiguous timeouts or started streams.
-
-## Use
+## Make Requests
 
 ```bash
 curl http://localhost:3000/ai/v1/chat/completions \
@@ -75,31 +101,51 @@ curl http://localhost:3000/ai/v1/chat/completions \
   -d '{"model":"fast-chat","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
-Endpoints:
+Available endpoints:
 
 - `GET /ai/v1/models`
 - `POST /ai/v1/chat/completions`
 - `POST /ai/v1/embeddings`
 
-OpenAI clients can use `http://localhost:3000/ai/v1` as base URL. Chat streaming uses SSE. Prompts and responses are proxied but never persisted; logs contain request metadata, attempts, latency, status, and reported non-streaming token usage.
+OpenAI clients can use `http://localhost:3000/ai/v1` as base URL.
 
-## Test
+## Development
 
 ```bash
+git clone https://github.com/azmi2409/rails-ai-gateway.git
+cd rails-ai-gateway
+bundle install
 bundle exec ruby test/check.rb
 gem build rails_ai_gateway.gemspec
 ```
 
-Set PostgreSQL URL to run same integration check against PostgreSQL:
+SQLite integration runs by default. Run same suite against PostgreSQL with an empty test
+database:
 
 ```bash
 DATABASE_URL=postgresql:///rails_ai_gateway_test bundle exec ruby test/check.rb
 ```
 
+Found bug or have focused improvement? Read [CONTRIBUTING.md](CONTRIBUTING.md), then open
+issue or pull request. Release notes live in [CHANGELOG.md](CHANGELOG.md).
+
+## Security
+
+Never expose admin UI without host authentication and authorization. Keep
+`allow_private_networks` and `allow_http` disabled for public providers. Enable both only
+for trusted internal endpoints, such as local Ollama. Never commit provider or database
+credentials.
+
+Report security issues privately through
+[GitHub security advisories](https://github.com/azmi2409/rails-ai-gateway/security/advisories/new),
+not public issues.
+
 ## Current Scope
 
-OpenAI-compatible chat completions, embeddings, and models endpoints. Native Anthropic, Gemini, Bedrock, budgets, semantic caching, and multi-tenancy are not included.
+Current release supports OpenAI-compatible chat completions, embeddings, and model-list
+endpoints. Native Anthropic, Gemini, Bedrock, budgets, semantic caching, and multi-tenancy
+are not included.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE).
