@@ -246,7 +246,7 @@ upstream.received.pop
 assert(client.get("#{base}/admin").status == 403, "admin default not closed")
 config.admin_authorization = ->(_controller) { true }
 response = client.get("#{base}/admin")
-assert(response.status == 200 && response.body.include?("Your models,") && response.body.include?("Engine online"), "admin render failed")
+assert(response.status == 200 && response.body.include?("AI Gateway Console") && response.body.include?("Engine online"), "admin render failed")
 assert(response.body.include?("/nested/ai/admin/providers"), "mounted form URL incorrect")
 assert(response.body.include?('data-label="Status"') && response.body.include?('rel="icon"'), "responsive admin metadata missing")
 assert(!response.body.include?("fake-upstream-key") && !response.body.include?(token), "admin disclosed credentials")

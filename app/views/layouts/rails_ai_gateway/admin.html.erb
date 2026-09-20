@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#07111f">
+    <meta name="theme-color" content="#ffffff">
     <title>Rails AI Gateway</title>
     <%= csrf_meta_tags %>
     <%= tag.link rel: "icon", href: favicon_path, type: "image/webp" %>
@@ -11,23 +11,75 @@
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
-    <header class="site-header">
-      <div class="header-inner">
-        <%= link_to admin_path, class: "brand", aria: { label: "Rails AI Gateway overview" } do %>
-          <%= image_tag logo_path, alt: "", width: 44, height: 44 %>
-          <span><strong>Rails AI</strong><small>Gateway console</small></span>
-        <% end %>
-        <nav aria-label="Gateway sections">
-          <%= link_to "Overview", admin_path %>
-          <%= link_to "Providers", admin_path(anchor: "providers") %>
-          <%= link_to "Models", admin_path(anchor: "models") %>
-          <%= link_to "Keys", admin_path(anchor: "keys") %>
-          <%= link_to "Logs", admin_path(anchor: "logs") %>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <%= link_to admin_path, class: "brand", aria: { label: "Rails AI Gateway overview" } do %>
+            <%= image_tag logo_path, alt: "", width: 32, height: 32 %>
+            <span><strong>Rails AI</strong><small>Gateway Console</small></span>
+          <% end %>
+        </div>
+        <nav class="sidebar-nav" aria-label="Gateway sections">
+          <%= link_to admin_path, class: "nav-item" do %>
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <rect x="3" y="3" width="6" height="6" rx="1.5"/>
+              <rect x="11" y="3" width="6" height="6" rx="1.5"/>
+              <rect x="3" y="11" width="6" height="6" rx="1.5"/>
+              <rect x="11" y="11" width="6" height="6" rx="1.5"/>
+            </svg>
+            <span>Overview</span>
+          <% end %>
+          <%= link_to admin_path(anchor: "providers"), class: "nav-item" do %>
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <rect x="2" y="4" width="16" height="12" rx="2"/>
+              <path d="M6 8h.01M10 8h.01M14 8h.01M6 12h8"/>
+            </svg>
+            <span>Providers</span>
+          <% end %>
+          <%= link_to admin_path(anchor: "models"), class: "nav-item" do %>
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M4 6h12M4 10h12M4 14h8"/>
+            </svg>
+            <span>Model Routing</span>
+          <% end %>
+          <%= link_to admin_path(anchor: "keys"), class: "nav-item" do %>
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M14 6a4 4 0 1 0-5.3 3.8L4 14.5V17h2.5l1.5-1.5v-1.5h1.5l1.2-1.2A4 4 0 0 0 14 6z"/>
+            </svg>
+            <span>Gateway Keys</span>
+          <% end %>
+          <%= link_to admin_path(anchor: "logs"), class: "nav-item" do %>
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M3 4h14v12H3z"/>
+              <path d="M6 8h8M6 12h5"/>
+            </svg>
+            <span>Request Logs</span>
+          <% end %>
         </nav>
-        <span class="system-state"><i aria-hidden="true"></i> Engine online</span>
+        <div class="sidebar-footer">
+          <div class="system-badge">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <span>Engine online</span>
+          </div>
+          <p class="sidebar-version">v<%= RailsAiGateway::VERSION %></p>
+        </div>
+      </aside>
+
+      <div class="main-wrapper">
+        <header class="topbar">
+          <div class="topbar-title">AI Gateway Administration</div>
+          <div class="topbar-status">
+            <span class="status-indicator">Connected to ActiveRecord</span>
+          </div>
+        </header>
+        <main id="main">
+          <%= yield %>
+        </main>
+        <footer class="app-footer">
+          <span>Rails AI Gateway <%= RailsAiGateway::VERSION %></span>
+          <span>Request metadata only · Prompts and responses are not stored.</span>
+        </footer>
       </div>
-    </header>
-    <main id="main"><%= yield %></main>
-    <footer><span>Rails AI Gateway <%= RailsAiGateway::VERSION %></span><span>Request metadata only. Prompts and responses are not stored.</span></footer>
+    </div>
   </body>
 </html>

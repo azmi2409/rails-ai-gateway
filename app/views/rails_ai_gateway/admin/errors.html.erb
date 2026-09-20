@@ -1,6 +1,6 @@
 <div class="focus-page">
-  <p class="eyebrow error-label">Validation error</p>
-  <h1>Could not save changes.</h1>
+  <div class="badge-tag" style="background:#fef2f2; border-color:#fecaca; color:#dc2626;">Validation Error</div>
+  <h1>Could not save changes</h1>
   <ul class="error-list" role="alert"><% @errors.each do |error| %><li><%= error %></li><% end %></ul>
-  <%= link_to "Return to gateway", admin_path, class: "back-link" %>
+  <%= link_to "Return to Gateway Console", admin_path, class: "btn btn-primary" %>
 </div>
