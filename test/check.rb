@@ -280,6 +280,7 @@ assert(client.get("#{base}/admin").status == 403, "admin default not closed")
 config.admin_authorization = ->(_controller) { true }
 response = client.get("#{base}/admin")
 assert(response.status == 200 && response.body.include?("AI Gateway Console") && response.body.include?("Engine online"), "admin render failed")
+assert(response["referrer-policy"] == "same-origin", "admin referrer policy breaks Rails CSRF origin checks")
 assert(response.body.include?("Token Usage by Model") && response.body.include?("Injected System Prompt"), "usage or prompt controls missing")
 assert(response.body.include?("/nested/ai/admin/providers"), "mounted form URL incorrect")
 assert(response.body.include?('data-label="Status"') && response.body.include?('rel="icon"'), "responsive admin metadata missing")
@@ -302,7 +303,7 @@ rejects("admin accepted request without CSRF", ActionController::InvalidAuthenti
 end
 csrf = CGI.unescapeHTML(response.body[/name="csrf-token" content="([^"]+)"/, 1])
 cookie = Array(response["set-cookie"]).map { |value| value.split(";", 2).first }.join("; ")
-admin_headers = { "HTTP_COOKIE" => cookie, "HTTP_X_CSRF_TOKEN" => csrf, "CONTENT_TYPE" => "application/x-www-form-urlencoded" }
+admin_headers = { "HTTP_COOKIE" => cookie, "HTTP_X_CSRF_TOKEN" => csrf, "HTTP_ORIGIN" => "http://example.org", "CONTENT_TYPE" => "application/x-www-form-urlencoded" }
 created = client.post("#{base}/admin/providers", **admin_headers, input: URI.encode_www_form("provider[name]" => "Another", "provider[base_url]" => upstream.url))
 assert(created.status == 303, "provider UI create failed: #{created.status}")
 template_created = client.post("#{base}/admin/providers", **admin_headers, input: URI.encode_www_form(template: "groq", api_key: "template-test-key"))

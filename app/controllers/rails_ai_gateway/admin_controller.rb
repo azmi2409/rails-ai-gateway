@@ -114,7 +114,7 @@ module RailsAiGateway
 
     def authorize_admin
       response.headers["Cache-Control"] = "no-store"
-      response.headers["Referrer-Policy"] = "no-referrer"
+      response.headers["Referrer-Policy"] = "same-origin"
       head :forbidden unless RailsAiGateway.configuration.admin_authorization.call(self) == true
     end
 
