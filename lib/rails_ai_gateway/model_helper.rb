@@ -1,4 +1,6 @@
 module RailsAiGateway
+  # Query helpers backing {RailsAIGateway.models}, {RailsAIGateway.model}, and
+  # {RailsAIGateway.route_for}. Prefer those top-level methods in application code.
   module ModelHelper
     module_function
 
@@ -24,8 +26,8 @@ module RailsAiGateway
       models.find { |entry| entry[:id] == name.to_s }
     end
 
-    def route_for(model:, query:)
-      route = ModelRoute.ranked_for_query(name: model, query: query).first
+    def route_for(model:, query:, capabilities: [])
+      route = ModelRoute.ranked_for_query(name: model, query: query, capabilities: capabilities).first
       route_metadata(route) if route
     end
 

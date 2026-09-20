@@ -10,11 +10,12 @@ Gem::Specification.new do |spec|
   spec.metadata = {
     "source_code_uri" => spec.homepage,
     "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
+    "documentation_uri" => "https://www.rubydoc.info/gems/rails-ai-gateway/#{spec.version}",
     "rubygems_mfa_required" => "true"
   }
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.3"
-  spec.files = Dir["{app,config,db,lib}/**/*", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE"].select { |path| File.file?(path) }
+  spec.files = Dir["{app,config,db,lib}/**/*", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE", ".yardopts"].select { |path| File.file?(path) }
   spec.add_dependency "railties", ">= 8.0", "< 9"
   spec.add_dependency "activerecord", ">= 8.0", "< 9"
   spec.add_dependency "actionpack", ">= 8.0", "< 9"

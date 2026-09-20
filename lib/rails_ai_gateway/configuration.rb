@@ -1,8 +1,28 @@
 module RailsAiGateway
+  # Runtime and security settings configured in host Rails initializer.
   class Configuration
-    attr_accessor :admin_authorization, :admin_controller, :open_timeout, :read_timeout,
-      :write_timeout, :request_timeout, :max_request_bytes, :max_response_bytes,
-      :max_attempts, :allow_private_networks, :allow_http
+    # @return [#call] callback receiving admin controller; must return exactly true
+    attr_accessor :admin_authorization
+    # @return [String] host controller class inherited by mounted admin controller
+    attr_accessor :admin_controller
+    # @return [Numeric] upstream connection timeout in seconds
+    attr_accessor :open_timeout
+    # @return [Numeric] upstream socket read timeout in seconds
+    attr_accessor :read_timeout
+    # @return [Numeric] upstream socket write timeout in seconds
+    attr_accessor :write_timeout
+    # @return [Numeric] total deadline across fallback attempts in seconds
+    attr_accessor :request_timeout
+    # @return [Integer] maximum accepted JSON request size in bytes
+    attr_accessor :max_request_bytes
+    # @return [Integer] maximum buffered non-streaming response size in bytes
+    attr_accessor :max_response_bytes
+    # @return [Integer] maximum provider routes attempted per request
+    attr_accessor :max_attempts
+    # @return [Boolean] whether upstream DNS may resolve to private/reserved networks
+    attr_accessor :allow_private_networks
+    # @return [Boolean] whether upstream providers may use unencrypted HTTP
+    attr_accessor :allow_http
 
     def initialize
       @admin_controller = "ActionController::Base"
@@ -18,6 +38,9 @@ module RailsAiGateway
       @allow_http = false
     end
 
+    # Validates all settings.
+    # @raise [ArgumentError] when a setting is invalid
+    # @return [nil]
     def validate!
       %i[open_timeout read_timeout write_timeout request_timeout].each do |name|
         value = public_send(name)

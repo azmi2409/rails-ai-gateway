@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.1 - 2026-09-20
+## 0.3.0 - 2026-09-21
 
 - Add durable input/output token totals grouped by public model.
 - Add per-route system prompt injection without prompt logging.
@@ -12,6 +12,8 @@
 - Use same-origin referrer policy so browser form submissions pass Rails CSRF origin checks.
 - Add safe delete actions for providers and model routes in admin console.
 - Use Nebius Token Factory API endpoint in provider template.
+- Validate and forward OpenAI-compatible text, image, and audio message parts.
+- Filter query routing by declared model capabilities.
 
 ## 0.2.0 - 2026-09-20
 

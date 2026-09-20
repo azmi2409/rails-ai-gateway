@@ -2,6 +2,7 @@
 
 [![Gem Version](https://badge.fury.io/rb/rails-ai-gateway.svg)](https://rubygems.org/gems/rails-ai-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![RubyDoc](https://img.shields.io/badge/docs-RubyDoc-blue.svg)](https://www.rubydoc.info/gems/rails-ai-gateway)
 
 Put one OpenAI-compatible endpoint in front of your AI providers without running another
 service. Rails AI Gateway mounts inside your Rails app, stores configuration and request
@@ -134,6 +135,11 @@ Routes declare capabilities from `text`, `vision`, `embedding`, `audio`, `video`
 and `reasoning`; clients receive merged capabilities in each `/v1/models` entry. Capability
 metadata does not add unsupported transport endpoints by itself.
 
+Chat requests support OpenAI-compatible multimodal content arrays containing `text`,
+`image_url` (HTTPS or image data URL), and `input_audio` (base64 WAV/MP3) parts. Gateway
+selects only routes advertising every required capability and forwards accepted parts without
+conversion. Request-size limit still applies to encoded media.
+
 Host Rails code can inspect active models without making an HTTP request:
 
 ```ruby
@@ -141,7 +147,7 @@ RailsAIGateway.models
 RailsAIGateway.models(capabilities: %w[vision tools])
 RailsAIGateway.models(provider: "OpenAI")
 RailsAIGateway.model("fast-chat")
-RailsAIGateway.route_for(model: "fast-chat", query: "Review this Ruby code")
+RailsAIGateway.route_for(model: "fast-chat", query: "Review this Ruby code", capabilities: %w[text tools])
 ```
 
 Helpers return provider names and routing metadata, never provider API keys. `route_for`
@@ -156,6 +162,7 @@ cd rails-ai-gateway
 bundle install
 bundle exec ruby test/check.rb
 gem build rails_ai_gateway.gemspec
+rdoc --main README.md README.md lib
 ```
 
 SQLite integration runs by default. Run same suite against PostgreSQL with an empty test

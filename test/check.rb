@@ -162,6 +162,22 @@ assert(log.status == 200 && log.usage["total_tokens"] == 7 && log.input_tokens =
 assert(!log.attributes.to_json.include?("private prompt"), "prompt persisted")
 assert(!log.attributes.to_json.include?("Always answer precisely"), "system prompt persisted in request log")
 
+vision_payload = payload.merge(messages: [{ role: "user", content: [
+  { type: "text", text: "Describe this" },
+  { type: "image_url", image_url: { url: "https://example.com/image.webp" } }
+] }])
+upstream.respond(200, { choices: [], usage: { prompt_tokens: 9, completion_tokens: 2 } })
+assert(post.call(vision_payload).status == 200, "vision request failed")
+forwarded_vision = upstream.received.pop.last
+assert(forwarded_vision.dig("messages", 1, "content", 1, "image_url", "url") == "https://example.com/image.webp", "vision content not forwarded")
+route.update!(capabilities: ["text"])
+assert(post.call(vision_payload).status == 404, "vision request used route without vision capability")
+route.update!(capabilities: %w[text vision tools])
+invalid_image = payload.merge(messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "http://unsafe.example/image" } }] }])
+assert(post.call(invalid_image).status == 400, "unsafe image URL accepted")
+audio_payload = payload.merge(messages: [{ role: "user", content: [{ type: "input_audio", input_audio: { data: "UklGRg==", format: "wav" } }] }])
+assert(post.call(audio_payload).status == 404, "audio request used route without audio capability")
+
 specialized = RailsAiGateway::ModelRoute.create!(provider: provider, name: "chat", upstream_model: "coding-chat", priority: 2, capabilities: %w[text tools], query_keywords: %w[ruby debugging])
 model_list = RailsAIGateway.models
 assert(model_list.map { |entry| entry[:id] } == %w[chat embedding], "model helper list incorrect")
@@ -170,6 +186,7 @@ assert(RailsAIGateway.models(provider: "Local").size == 2, "model helper provide
 assert(RailsAIGateway.model("chat")[:capabilities].sort == %w[text tools vision], "model helper lookup failed")
 selected = RailsAIGateway.route_for(model: "chat", query: "Ruby debugging help")
 assert(selected[:upstream_model] == "coding-chat" && !selected.key?(:system_prompt), "model helper query routing or metadata safety failed")
+assert(RailsAIGateway.route_for(model: "chat", query: "Ruby debugging help", capabilities: ["audio"]).nil?, "model helper ignored capability filter")
 upstream.respond(200, { choices: [], usage: { prompt_tokens: 3, completion_tokens: 1 } })
 assert(post.call(payload.merge(messages: [{ role: "user", content: "Help debug this Ruby service" }])).status == 200, "query route failed")
 assert(upstream.received.pop.last["model"] == "coding-chat", "query keyword route not selected first")

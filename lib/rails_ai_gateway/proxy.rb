@@ -6,6 +6,8 @@ require "timeout"
 require "securerandom"
 
 module RailsAiGateway
+  # Internal Rack endpoint implementing OpenAI-compatible proxy behavior.
+  # @api private
   class Proxy
     class Failure < StandardError
       attr_reader :status
@@ -71,7 +73,7 @@ module RailsAiGateway
 
       payload = parse_request(request)
       return error("Model is not allowed", 403) unless key.allows?(payload["model"])
-      routes = ModelRoute.ranked_for_query(name: payload["model"], query: query_text(payload)).first(config.max_attempts)
+      routes = ModelRoute.ranked_for_query(name: payload["model"], query: query_text(payload), capabilities: required_capabilities(payload)).first(config.max_attempts)
       return error("No route for requested model", 404) if routes.empty?
 
       log = RequestLog.create!(request_id: SecureRandom.uuid, gateway_key: key, model: payload["model"], endpoint: @endpoint)
@@ -106,7 +108,7 @@ module RailsAiGateway
       end
       if @endpoint == "chat/completions"
         messages = payload["messages"]
-        unless messages.is_a?(Array) && messages.any? && messages.all? { |message| message.is_a?(Hash) && %w[developer system user assistant tool function].include?(message["role"]) }
+        unless messages.is_a?(Array) && messages.any? && messages.all? { |message| valid_message?(message) }
           raise Failure.new("messages must be a nonempty array with valid roles", 400)
         end
       else
@@ -118,6 +120,33 @@ module RailsAiGateway
         raise Failure.new("input must contain text or token IDs; embeddings cannot stream", 400) unless valid && !payload["stream"]
       end
       payload
+    end
+
+    def valid_message?(message)
+      return false unless message.is_a?(Hash) && %w[developer system user assistant tool function].include?(message["role"])
+      content = message["content"]
+      return true if content.is_a?(String)
+      return false unless content.is_a?(Array) && content.any?
+
+      content.all? do |part|
+        next false unless part.is_a?(Hash)
+        case part["type"]
+        when "text" then part["text"].is_a?(String)
+        when "image_url"
+          url = part.dig("image_url", "url")
+          url.is_a?(String) && (url.start_with?("https://") || url.match?(%r{\Adata:image/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+\z}))
+        when "input_audio"
+          audio = part["input_audio"]
+          audio.is_a?(Hash) && %w[wav mp3].include?(audio["format"]) && audio["data"].is_a?(String) && audio["data"].match?(/\A[A-Za-z0-9+\/=]+\z/)
+        else false
+        end
+      end
+    end
+
+    def required_capabilities(payload)
+      return ["embedding"] if @endpoint == "embeddings"
+      types = payload["messages"].flat_map { |message| Array(message["content"]).filter_map { |part| part["type"] if part.is_a?(Hash) } }
+      ["text", ("vision" if types.include?("image_url")), ("audio" if types.include?("input_audio"))].compact
     end
 
     def query_text(payload)

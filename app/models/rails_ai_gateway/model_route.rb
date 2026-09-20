@@ -11,8 +11,10 @@ module RailsAiGateway
     validates :priority, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, uniqueness: { scope: :name }
     scope :available, -> { joins(:provider).where(rails_ai_gateway_providers: { enabled: true }) }
 
-    def self.ranked_for_query(name:, query:)
+    def self.ranked_for_query(name:, query:, capabilities: [])
       routes = available.where(name: name).includes(:provider).order(:priority).to_a
+      required = Array(capabilities).map(&:to_s)
+      routes.select! { |route| (required - route.capabilities).empty? }
       normalized_query = query.to_s.downcase
       matched, generic = routes.partition { |route| route.query_keywords.any? { |keyword| normalized_query.include?(keyword) } }
       matched + generic.select { |route| route.query_keywords.empty? }
