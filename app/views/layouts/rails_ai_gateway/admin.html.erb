@@ -3,22 +3,31 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#07111f">
     <title>Rails AI Gateway</title>
     <%= csrf_meta_tags %>
+    <%= tag.link rel: "icon", href: favicon_path, type: "image/webp" %>
     <%= stylesheet_link_tag style_path %>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
-    <header>
-      <%= link_to "Rails AI Gateway", admin_path, class: "brand" %>
-      <nav aria-label="Gateway sections">
-        <%= link_to "Providers", admin_path(anchor: "providers") %>
-        <%= link_to "Models", admin_path(anchor: "models") %>
-        <%= link_to "Keys", admin_path(anchor: "keys") %>
-        <%= link_to "Logs", admin_path(anchor: "logs") %>
-      </nav>
+    <header class="site-header">
+      <div class="header-inner">
+        <%= link_to admin_path, class: "brand", aria: { label: "Rails AI Gateway overview" } do %>
+          <%= image_tag logo_path, alt: "", width: 44, height: 44 %>
+          <span><strong>Rails AI</strong><small>Gateway console</small></span>
+        <% end %>
+        <nav aria-label="Gateway sections">
+          <%= link_to "Overview", admin_path %>
+          <%= link_to "Providers", admin_path(anchor: "providers") %>
+          <%= link_to "Models", admin_path(anchor: "models") %>
+          <%= link_to "Keys", admin_path(anchor: "keys") %>
+          <%= link_to "Logs", admin_path(anchor: "logs") %>
+        </nav>
+        <span class="system-state"><i aria-hidden="true"></i> Engine online</span>
+      </div>
     </header>
     <main id="main"><%= yield %></main>
-    <footer>Rails AI Gateway <%= RailsAiGateway::VERSION %> · Request metadata only. Prompts and responses are not stored.</footer>
+    <footer><span>Rails AI Gateway <%= RailsAiGateway::VERSION %></span><span>Request metadata only. Prompts and responses are not stored.</span></footer>
   </body>
 </html>

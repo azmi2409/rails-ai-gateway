@@ -66,6 +66,14 @@ module RailsAiGateway
       send_file Engine.root.join("app/assets/stylesheets/rails_ai_gateway/admin.css"), type: "text/css", disposition: "inline"
     end
 
+    def logo
+      send_file Engine.root.join("app/assets/images/rails_ai_gateway/logo.webp"), type: "image/webp", disposition: "inline"
+    end
+
+    def favicon
+      send_file Engine.root.join("app/assets/images/rails_ai_gateway/favicon.webp"), type: "image/webp", disposition: "inline"
+    end
+
     private
 
     def authorize_admin

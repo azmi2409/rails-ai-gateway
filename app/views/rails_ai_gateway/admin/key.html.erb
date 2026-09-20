@@ -1,5 +1,10 @@
-<h1>Gateway key created</h1>
-<p>Copy this token now. Only its digest is stored; it cannot be displayed again.</p>
-<label for="new-token"><%= @key.name %></label>
-<textarea id="new-token" readonly rows="3" autocomplete="off" spellcheck="false"><%= @token %></textarea>
-<p><%= link_to "Back to gateway", admin_path %></p>
+<div class="focus-page">
+  <p class="eyebrow">Credential issued</p>
+  <h1>Save this key now.</h1>
+  <p class="hero-copy">Only its digest is stored. This token cannot be displayed again after leaving this page.</p>
+  <div class="token-card">
+    <label for="new-token"><%= @key.name %></label>
+    <textarea id="new-token" readonly rows="3" autocomplete="off" spellcheck="false"><%= @token %></textarea>
+  </div>
+  <%= link_to "Return to gateway", admin_path, class: "back-link" %>
+</div>

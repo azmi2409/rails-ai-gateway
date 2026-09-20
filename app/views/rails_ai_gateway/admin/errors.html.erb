@@ -1,3 +1,6 @@
-<h1>Could not save changes</h1>
-<ul role="alert"><% @errors.each do |error| %><li><%= error %></li><% end %></ul>
-<%= link_to "Back to gateway", admin_path %>
+<div class="focus-page">
+  <p class="eyebrow error-label">Validation error</p>
+  <h1>Could not save changes.</h1>
+  <ul class="error-list" role="alert"><% @errors.each do |error| %><li><%= error %></li><% end %></ul>
+  <%= link_to "Return to gateway", admin_path, class: "back-link" %>
+</div>

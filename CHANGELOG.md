@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 - 2026-09-20
+
+- Redesign admin UI as a responsive AI gateway operations console.
+- Add generated WebP brand mark and favicon served under any engine mount path.
+- Improve dashboard metrics, provider and route summaries, key status, and request-log scanning.
+- Add mobile card tables, stronger keyboard focus, and reduced-motion support.
+
 ## 0.1.1 - 2026-09-20
 
 - Fix automatic Bundler loading for hyphenated gem name.

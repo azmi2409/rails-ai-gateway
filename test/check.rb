@@ -246,10 +246,15 @@ upstream.received.pop
 assert(client.get("#{base}/admin").status == 403, "admin default not closed")
 config.admin_authorization = ->(_controller) { true }
 response = client.get("#{base}/admin")
-assert(response.status == 200 && response.body.include?("Gateway overview"), "admin render failed")
+assert(response.status == 200 && response.body.include?("Your models,") && response.body.include?("Engine online"), "admin render failed")
 assert(response.body.include?("/nested/ai/admin/providers"), "mounted form URL incorrect")
+assert(response.body.include?('data-label="Status"') && response.body.include?('rel="icon"'), "responsive admin metadata missing")
 assert(!response.body.include?("fake-upstream-key") && !response.body.include?(token), "admin disclosed credentials")
 assert(client.get("#{base}/admin/style").body.include?(":root"), "stylesheet missing")
+logo = client.get("#{base}/admin/logo")
+favicon = client.get("#{base}/admin/favicon")
+assert(logo.status == 200 && logo["content-type"] == "image/webp" && logo.body.bytesize > 1_000, "logo missing")
+assert(favicon.status == 200 && favicon["content-type"] == "image/webp" && favicon.body.bytesize > 500, "favicon missing")
 rejects("admin accepted request without CSRF", ActionController::InvalidAuthenticityToken) do
   client.post("#{base}/admin/providers", input: "provider[name]=bad")
 end

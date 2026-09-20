@@ -13,4 +13,6 @@ RailsAiGateway::Engine.routes.draw do
   post "admin/gateway_keys", to: "admin#create_gateway_key", as: :gateway_keys
   delete "admin/gateway_keys/:id", to: "admin#revoke_gateway_key", as: :gateway_key
   get "admin/style", to: "admin#style", as: :style
+  get "admin/logo", to: "admin#logo", as: :logo
+  get "admin/favicon", to: "admin#favicon", as: :favicon
 end
