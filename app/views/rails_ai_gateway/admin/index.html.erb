@@ -72,7 +72,7 @@
 
   <div class="provider-catalog" aria-label="Provider templates">
     <% @provider_templates.each do |template_id, template| %>
-      <% connected = @providers.any? { |provider| provider.base_url == template[:base_url] } %>
+      <% connected = @providers.any? { |provider| provider.base_url.delete_suffix("/") == template[:base_url].delete_suffix("/") } %>
       <div class="provider-template <%= "template-connected" if connected %>">
         <button type="button" class="provider-template-button" <%= "disabled" if connected %> data-provider-connect data-template="<%= template_id %>" data-provider-name="<%= template[:name] %>" data-logo="<%= provider_logo_path(template: template_id) %>">
           <%= image_tag provider_logo_path(template: template_id), class: "provider-logo", alt: "#{template[:name]} logo", width: 38, height: 38 %>

@@ -9,7 +9,7 @@ module RailsAiGateway
       "deepseek" => { name: "DeepSeek", base_url: "https://api.deepseek.com" },
       "mistral" => { name: "Mistral AI", base_url: "https://api.mistral.ai/v1" },
       "cerebras" => { name: "Cerebras", base_url: "https://api.cerebras.ai/v1" },
-      "nebius" => { name: "Nebius AI", base_url: "https://api.studio.nebius.ai/v1" },
+      "nebius" => { name: "Nebius AI", base_url: "https://api.tokenfactory.us-north1.nebius.com/v1/" },
       "perplexity" => { name: "Perplexity", base_url: "https://api.perplexity.ai" }
     }.freeze
 

@@ -118,6 +118,7 @@ rejects("truthy string accepted") { RailsAiGateway::Configuration.new.tap { |c| 
 provider = RailsAiGateway::Provider.create!(name: "Local", base_url: upstream.url, api_key: "fake-upstream-key")
 assert(!provider.api_key_before_type_cast.include?("fake-upstream-key"), "provider credential stored unencrypted")
 assert(!RailsAiGateway::Provider.new(name: "bad", base_url: "http://user:pass@example.com/v1").valid?, "URL credentials accepted")
+assert(RailsAiGateway::Provider::TEMPLATES.dig("nebius", :base_url) == "https://api.tokenfactory.us-north1.nebius.com/v1/", "Nebius template endpoint incorrect")
 canonical = RailsAiGateway::Provider.new(name: "canonical", base_url: "  #{upstream.url}/chat/completions/  ")
 canonical.valid?
 assert(canonical.base_url == upstream.url, "provider endpoint path not normalized")
