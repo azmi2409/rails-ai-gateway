@@ -104,6 +104,9 @@ rejects("truthy string accepted") { RailsAiGateway::Configuration.new.tap { |c| 
 provider = RailsAiGateway::Provider.create!(name: "Local", base_url: upstream.url, api_key: "fake-upstream-key")
 assert(!provider.api_key_before_type_cast.include?("fake-upstream-key"), "provider credential stored unencrypted")
 assert(!RailsAiGateway::Provider.new(name: "bad", base_url: "http://user:pass@example.com/v1").valid?, "URL credentials accepted")
+canonical = RailsAiGateway::Provider.new(name: "canonical", base_url: "  #{upstream.url}/chat/completions/  ")
+canonical.valid?
+assert(canonical.base_url == upstream.url, "provider endpoint path not normalized")
 route = RailsAiGateway::ModelRoute.create!(provider: provider, name: "chat", upstream_model: "upstream-chat")
 RailsAiGateway::ModelRoute.create!(provider: provider, name: "embedding", upstream_model: "upstream-embedding")
 key, token = RailsAiGateway::GatewayKey.issue!(name: "test", allowed_models: ["chat"])
@@ -160,8 +163,17 @@ upstream.respond(503, { error: { message: "unavailable" } })
 assert(post.call.status == 503, "attempt cap ignored")
 upstream.received.pop
 config.max_attempts = 3
-upstream.respond(400, { error: { message: "bad request" } })
-assert(post.call.status == 400, "upstream error not preserved")
+upstream.respond(400, { error: { message: "bad request", type: "provider_specific" } })
+bad_request = post.call
+bad_request_body = JSON.parse(bad_request.body)
+assert(bad_request.status == 400, "upstream error status not preserved")
+assert(bad_request_body == { "error" => { "message" => "bad request", "type" => "invalid_request_error", "code" => "invalid_request" } }, "upstream error not normalized")
+upstream.received.pop
+upstream.respond(429, { message: "slow down" }, { "Retry-After" => "17" })
+fallback.destroy!
+limited = post.call
+assert(limited.status == 429 && limited["retry-after"] == "17", "retry-after not preserved")
+assert(JSON.parse(limited.body).dig("error", "type") == "rate_limit_error", "rate limit error not normalized")
 upstream.received.pop
 upstream.respond(302, "", { "Location" => "http://example.com/" })
 assert(post.call.status == 502, "redirect followed")
@@ -208,11 +220,28 @@ body.close if body.respond_to?(:close)
 assert(events.join.include?("[DONE]"), "stream incomplete")
 upstream.received.pop
 
+upstream.plans << ->(socket) do
+  socket.write("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n")
+  first = "data: {\"choices\":[]}\n\n"
+  socket.write("#{first.bytesize.to_s(16)}\r\n#{first}\r\n")
+end
+status, _, body = Rails.application.call(Rack::MockRequest.env_for("#{base}/v1/chat/completions", method: "POST", input: JSON.generate(payload.merge(stream: true)), "CONTENT_TYPE" => "application/json", **auth))
+broken_chunks = []
+body.each { |chunk| broken_chunks << chunk }
+broken_events = broken_chunks.join
+body.close if body.respond_to?(:close)
+assert(status == 200 && broken_events.include?("Upstream stream failed") && broken_events.end_with?("data: [DONE]\n\n"), "broken stream lacks terminal error")
+upstream.received.pop
+
 key.update!(allowed_models: [])
 upstream.respond(200, { data: [{ embedding: [0.1] }] })
 embedding = client.post("#{base}/v1/embeddings", **auth, "CONTENT_TYPE" => "application/json", input: JSON.generate(model: "embedding", input: "hello"))
 assert(embedding.status == 200, "embeddings failed")
 assert(upstream.received.pop.first.include?("POST /v1/embeddings"), "embedding path incorrect")
+upstream.respond(200, { object: "list" })
+malformed_embedding = client.post("#{base}/v1/embeddings", **auth, "CONTENT_TYPE" => "application/json", input: JSON.generate(model: "embedding", input: "hello"))
+assert(malformed_embedding.status == 502, "malformed embedding response accepted")
+upstream.received.pop
 
 assert(client.get("#{base}/admin").status == 403, "admin default not closed")
 config.admin_authorization = ->(_controller) { true }

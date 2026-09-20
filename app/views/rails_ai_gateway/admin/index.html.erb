@@ -54,7 +54,7 @@
     <%= form_with scope: :model_route, url: model_routes_path, local: true, class: "grid", namespace: "new_route" do |form| %>
       <div><%= form.label :name, "Public model name" %><%= form.text_field :name, required: true, placeholder: "fast-chat" %></div>
       <div><%= form.label :provider_id %><%= form.collection_select :provider_id, @providers, :id, :name %></div>
-      <div><%= form.label :upstream_model %><%= form.text_field :upstream_model, required: true, placeholder: "gpt-4o-mini" %></div>
+      <div><%= form.label :upstream_model %><%= form.text_field :upstream_model, required: true, placeholder: "gpt-5.6-luna" %></div>
       <div><%= form.label :priority %><%= form.number_field :priority, value: 0, min: 0, required: true %></div>
       <%= form.submit "Add route", disabled: @providers.empty? %>
     <% end %>

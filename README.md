@@ -51,7 +51,7 @@ Provider API keys cannot be saved without it.
 Web UI guides initial setup:
 
 1. Add provider with full API base URL, such as `https://api.openai.com/v1`.
-2. Add public model route, such as `fast-chat` mapped to `gpt-4o-mini`.
+2. Add public model route, such as `fast-chat` mapped to `gpt-5.6-luna`.
 3. Create gateway key and save token when shown. Raw token cannot be displayed again.
 
 Routes with same public model name form fallback chain. Lower priority runs first. Gateway

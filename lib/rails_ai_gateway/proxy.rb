@@ -39,6 +39,15 @@ module RailsAiGateway
     end
 
     RETRY_STATUSES = [429, 500, 502, 503, 504].freeze
+    ERROR_TYPES = {
+      400 => ["invalid_request_error", "invalid_request"],
+      401 => ["authentication_error", "invalid_api_key"],
+      403 => ["permission_error", "permission_denied"],
+      404 => ["invalid_request_error", "model_not_found"],
+      409 => ["conflict_error", "conflict"],
+      422 => ["invalid_request_error", "unprocessable_entity"],
+      429 => ["rate_limit_error", "rate_limit_exceeded"]
+    }.freeze
     PRIVATE_RANGES = %w[0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16
       172.16.0.0/12 192.0.0.0/24 192.0.2.0/24 192.168.0.0/16 198.18.0.0/15
       198.51.100.0/24 203.0.113.0/24 224.0.0.0/4 240.0.0.0/4 ::/128 ::1/128
@@ -122,6 +131,9 @@ module RailsAiGateway
               ready << [response.code.to_i, headers]
               response.read_body { |chunk| chunks << chunk }
             end
+            if sent_headers && result.first >= 400
+              chunks << "data: #{JSON.generate(error_payload("Upstream stream failed", result.first))}\n\ndata: [DONE]\n\n"
+            end
             ready << result unless sent_headers
           rescue StandardError
             ready << error("Gateway failed", 500) unless sent_headers
@@ -169,6 +181,8 @@ module RailsAiGateway
                 status = attempt[:status] = response.code.to_i
                 raise Failure, "Upstream redirects are not supported" if (300..399).cover?(status)
                 headers = { "content-type" => "application/json", "cache-control" => "no-store", "x-request-id" => request_id }
+                retry_after = response["retry-after"].to_s
+                headers["retry-after"] = retry_after if retry_after.match?(/\A\d{1,10}\z/)
                 if payload["stream"] && (200..299).cover?(status)
                   raise Failure, "Upstream did not return an event stream" unless response["content-type"].to_s.split(";").first == "text/event-stream"
                   headers.merge!("content-type" => "text/event-stream", "x-accel-buffering" => "no")
@@ -189,7 +203,14 @@ module RailsAiGateway
                     end
                     raise Failure, "Upstream did not return a JSON object" unless parsed.is_a?(Hash)
                     usage = parsed["usage"].slice("prompt_tokens", "completion_tokens", "total_tokens").select { |_, value| value.is_a?(Integer) && value >= 0 } if parsed["usage"].is_a?(Hash)
-                    result = [status, headers, [body]]
+                    if (200..299).cover?(status)
+                      raise Failure, "Upstream embeddings response is malformed" if @endpoint == "embeddings" && !parsed["data"].is_a?(Array)
+                      result = [status, headers, [body]]
+                    else
+                      message = parsed.dig("error", "message") || parsed["message"] || parsed["error"]
+                      message = "Upstream request failed" unless message.is_a?(String) && message.present?
+                      result = [status, headers, [JSON.generate(error_payload(message, status))]]
+                    end
                   end
                 end
               end
@@ -233,7 +254,7 @@ module RailsAiGateway
     end
 
     def error(message, status, request_id = nil)
-      response = json(status, error: { message: message, type: "gateway_error", code: status })
+      response = json(status, error_payload(message, status))
       response[1]["www-authenticate"] = "Bearer" if status == 401
       response[1]["x-request-id"] = request_id if request_id
       response
@@ -241,6 +262,11 @@ module RailsAiGateway
 
     def json(status, payload)
       [status, { "content-type" => "application/json", "cache-control" => "no-store" }, [JSON.generate(payload)]]
+    end
+
+    def error_payload(message, status)
+      type, code = ERROR_TYPES.fetch(status, ["server_error", status == 504 ? "gateway_timeout" : "bad_gateway"])
+      { error: { message: message, type: type, code: code } }
     end
   end
 end
