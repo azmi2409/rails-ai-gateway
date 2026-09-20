@@ -142,6 +142,10 @@
               <%= form.submit "Save Changes", class: "btn btn-primary" %>
             </div>
           <% end %>
+          <div class="danger-zone">
+            <div><strong>Delete provider</strong><small>Provider must have no model routes.</small></div>
+            <%= button_to "Delete Provider", provider_path(provider), method: :delete, class: "btn btn-danger-outline", aria: { label: "Delete provider #{provider.name}" }, form: { data: { turbo_confirm: "Delete provider '#{provider.name}'? This cannot be undone." } } %>
+          </div>
         </div>
       </details>
     <% end %>
@@ -233,11 +237,14 @@
                 <% end %>
               </div>
             </fieldset>
-            <div class="form-submit flex-between">
+            <div class="form-submit">
               <%= form.submit "Save Route", class: "btn btn-primary" %>
-              <%= button_to "Delete Route", model_route_path(route), method: :delete, class: "btn btn-danger-outline", data: { confirm: "Delete this route?" } %>
             </div>
           <% end %>
+          <div class="danger-zone">
+            <div><strong>Delete model route</strong><small>Removes this destination from its fallback chain.</small></div>
+            <%= button_to "Delete Model", model_route_path(route), method: :delete, class: "btn btn-danger-outline", aria: { label: "Delete model route #{route.name} to #{route.upstream_model}" }, form: { data: { turbo_confirm: "Delete model route '#{route.name}' to '#{route.upstream_model}'?" } } %>
+          </div>
         </div>
       </details>
     <% end %>

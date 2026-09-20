@@ -720,6 +720,20 @@ main {
   margin-top: 0.5rem;
 }
 
+.danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-danger-border);
+}
+
+.danger-zone strong, .danger-zone small { display: block; }
+.danger-zone strong { color: var(--color-danger); font-size: 0.82rem; }
+.danger-zone small { margin-top: 0.1rem; color: var(--color-text-muted); font-size: 0.74rem; }
+
 /* Buttons */
 .btn {
   display: inline-flex;

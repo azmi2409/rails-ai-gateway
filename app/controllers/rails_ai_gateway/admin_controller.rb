@@ -5,6 +5,7 @@ module RailsAiGateway
     skip_forgery_protection only: :script
     before_action :authorize_admin
     rescue_from ActiveRecord::RecordInvalid, with: :invalid_record
+    rescue_from ActiveRecord::RecordNotDestroyed, with: :invalid_record
     rescue_from ActiveRecord::RecordNotFound, with: -> { head :not_found }
     rescue_from ActiveRecord::RecordNotUnique, with: -> { render plain: "Name or priority already exists", status: 422 }
 
@@ -48,6 +49,11 @@ module RailsAiGateway
       attributes.delete(:api_key) if attributes[:api_key].blank?
       attributes[:api_key] = nil if params[:clear_api_key] == "1"
       Provider.find(params[:id]).update!(attributes)
+      redirect_to admin_path, status: :see_other
+    end
+
+    def destroy_provider
+      Provider.find(params[:id]).destroy!
       redirect_to admin_path, status: :see_other
     end
 

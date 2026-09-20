@@ -7,6 +7,7 @@ RailsAiGateway::Engine.routes.draw do
   get "admin", to: "admin#index", as: :admin
   post "admin/providers", to: "admin#create_provider", as: :providers
   patch "admin/providers/:id", to: "admin#update_provider", as: :provider
+  delete "admin/providers/:id", to: "admin#destroy_provider"
   post "admin/model_routes", to: "admin#create_model_route", as: :model_routes
   patch "admin/model_routes/:id", to: "admin#update_model_route", as: :model_route
   delete "admin/model_routes/:id", to: "admin#destroy_model_route"

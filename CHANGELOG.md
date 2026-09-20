@@ -10,6 +10,7 @@
 - Add provider logos, modal connection flow, and deterministic keyword query routing.
 - Add `models`, `model`, and `route_for` helpers for host Rails code.
 - Use same-origin referrer policy so browser form submissions pass Rails CSRF origin checks.
+- Add safe delete actions for providers and model routes in admin console.
 
 ## 0.2.0 - 2026-09-20
 
