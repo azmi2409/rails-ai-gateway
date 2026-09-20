@@ -1,0 +1,5 @@
+<h1>Gateway key created</h1>
+<p>Copy this token now. Only its digest is stored; it cannot be displayed again.</p>
+<label for="new-token"><%= @key.name %></label>
+<textarea id="new-token" readonly rows="3" autocomplete="off" spellcheck="false"><%= @token %></textarea>
+<p><%= link_to "Back to gateway", admin_path %></p>

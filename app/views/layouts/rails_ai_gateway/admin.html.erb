@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rails AI Gateway</title>
+    <%= csrf_meta_tags %>
+    <%= stylesheet_link_tag style_path %>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header>
+      <%= link_to "Rails AI Gateway", admin_path, class: "brand" %>
+      <nav aria-label="Gateway sections">
+        <%= link_to "Providers", admin_path(anchor: "providers") %>
+        <%= link_to "Models", admin_path(anchor: "models") %>
+        <%= link_to "Keys", admin_path(anchor: "keys") %>
+        <%= link_to "Logs", admin_path(anchor: "logs") %>
+      </nav>
+    </header>
+    <main id="main"><%= yield %></main>
+    <footer>Rails AI Gateway <%= RailsAiGateway::VERSION %> · Request metadata only. Prompts and responses are not stored.</footer>
+  </body>
+</html>

@@ -1,0 +1,110 @@
+<h1>Gateway overview</h1>
+<p class="muted">One endpoint for your models. Configuration and traffic live in your Rails database.</p>
+<div class="stats" aria-label="Last 24 hours">
+  <div><span>Requests · 24 hours</span><strong><%= @requests %></strong></div>
+  <div><span>Errors · 24 hours</span><strong><%= @errors %></strong></div>
+  <div><span>Average latency</span><strong><%= @latency %> ms</strong></div>
+</div>
+
+<section id="providers">
+  <h2>Providers</h2>
+  <p>Use the complete API base URL, including <code>/v1</code> where required. Credentials are encrypted with ActiveRecord encryption.</p>
+  <% @providers.each do |provider| %>
+    <details>
+      <summary><%= provider.name %> <span class="badge"><%= provider.enabled? ? "Enabled" : "Disabled" %></span></summary>
+      <%= form_with scope: :provider, url: provider_path(provider), method: :patch, local: true, class: "grid", namespace: "provider_#{provider.id}" do |form| %>
+        <div><%= form.label :name %><%= form.text_field :name, value: provider.name, required: true %></div>
+        <div><%= form.label :base_url, "API base URL" %><%= form.url_field :base_url, value: provider.base_url, required: true %></div>
+        <div><%= form.label :api_key, "Replace API key (blank keeps existing)" %><%= form.password_field :api_key, autocomplete: "new-password" %></div>
+        <div class="check"><%= form.check_box :enabled, checked: provider.enabled? %><%= form.label :enabled %></div>
+        <div class="check"><%= check_box_tag :clear_api_key, "1", false, id: "clear_key_#{provider.id}" %><%= label_tag "clear_key_#{provider.id}", "Remove stored API key" %></div>
+        <%= form.submit "Save provider" %>
+      <% end %>
+    </details>
+  <% end %>
+  <details <%= "open" if @providers.empty? %>>
+    <summary>Add provider</summary>
+    <%= form_with scope: :provider, url: providers_path, local: true, class: "grid", namespace: "new_provider" do |form| %>
+      <div><%= form.label :name %><%= form.text_field :name, required: true, placeholder: "OpenAI" %></div>
+      <div><%= form.label :base_url, "API base URL" %><%= form.url_field :base_url, required: true, placeholder: "https://api.openai.com/v1" %></div>
+      <div><%= form.label :api_key, "API key (optional for local providers)" %><%= form.password_field :api_key, autocomplete: "new-password" %></div>
+      <%= form.submit "Add provider" %>
+    <% end %>
+  </details>
+</section>
+
+<section id="models">
+  <h2>Model routing</h2>
+  <p>Clients use the public model name. Lower priority runs first; matching names form an ordered fallback chain.</p>
+  <% @routes.each do |route| %>
+    <details>
+      <summary><%= route.name %> <span class="badge"><%= route.provider.name %> · priority <%= route.priority %></span></summary>
+      <%= form_with scope: :model_route, url: model_route_path(route), method: :patch, local: true, class: "grid", namespace: "route_#{route.id}" do |form| %>
+        <div><%= form.label :name, "Public model name" %><%= form.text_field :name, value: route.name, required: true %></div>
+        <div><%= form.label :provider_id %><%= form.collection_select :provider_id, @providers, :id, :name, selected: route.provider_id %></div>
+        <div><%= form.label :upstream_model %><%= form.text_field :upstream_model, value: route.upstream_model, required: true %></div>
+        <div><%= form.label :priority %><%= form.number_field :priority, value: route.priority, min: 0, required: true %></div>
+        <%= form.submit "Save route" %>
+      <% end %>
+      <%= button_to "Delete route", model_route_path(route), method: :delete, class: "danger" %>
+    </details>
+  <% end %>
+  <details>
+    <summary>Add model route</summary>
+    <%= form_with scope: :model_route, url: model_routes_path, local: true, class: "grid", namespace: "new_route" do |form| %>
+      <div><%= form.label :name, "Public model name" %><%= form.text_field :name, required: true, placeholder: "fast-chat" %></div>
+      <div><%= form.label :provider_id %><%= form.collection_select :provider_id, @providers, :id, :name %></div>
+      <div><%= form.label :upstream_model %><%= form.text_field :upstream_model, required: true, placeholder: "gpt-4o-mini" %></div>
+      <div><%= form.label :priority %><%= form.number_field :priority, value: 0, min: 0, required: true %></div>
+      <%= form.submit "Add route", disabled: @providers.empty? %>
+    <% end %>
+  </details>
+</section>
+
+<section id="keys">
+  <h2>Gateway keys</h2>
+  <div class="table-wrap">
+    <table>
+      <caption>Client access keys</caption>
+      <thead><tr><th scope="col">Name</th><th scope="col">Prefix</th><th scope="col">Models</th><th scope="col">Expires</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+      <tbody>
+        <% @keys.each do |key| %>
+          <tr><td><%= key.name %></td><td><code><%= key.prefix %>…</code></td><td><%= key.allowed_models.empty? ? "All models" : key.allowed_models.join(", ") %></td><td><%= key.expires_at || "Never" %></td><td><%= key.revoked_at ? "Revoked" : key.expires_at&.past? ? "Expired" : "Active" %></td><td><%= button_to "Revoke #{key.name}", gateway_key_path(key), method: :delete, class: "danger" unless key.revoked_at %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <details>
+    <summary>Create gateway key</summary>
+    <%= form_with scope: :gateway_key, url: gateway_keys_path, local: true, class: "grid" do |form| %>
+      <div><%= form.label :name %><%= form.text_field :name, required: true, placeholder: "Production app" %></div>
+      <div><%= form.label :allowed_models, "Allowed models (comma separated; blank allows all)" %><%= form.text_field :allowed_models, placeholder: "fast-chat, embeddings" %></div>
+      <div><%= form.label :expires_at, "Expires at (#{Time.zone.name})" %><%= form.datetime_local_field :expires_at %></div>
+      <%= form.submit "Create key" %>
+    <% end %>
+  </details>
+</section>
+
+<section id="logs">
+  <h2>Request logs</h2>
+  <%= form_with url: admin_path(anchor: "logs"), method: :get, local: true, class: "grid" do |form| %>
+    <div><%= form.label :model, "Model filter" %><%= form.text_field :model, value: params[:model] %></div>
+    <div><%= form.label :status, "HTTP status filter" %><%= form.number_field :status, value: params[:status], min: 100, max: 599 %></div>
+    <%= form.submit "Filter logs" %>
+  <% end %>
+  <div class="table-wrap">
+    <table>
+      <caption>Latest 50 matching requests</caption>
+      <thead><tr><th scope="col">Time</th><th scope="col">Model</th><th scope="col">Status</th><th scope="col">Latency</th><th scope="col">Reported tokens</th><th scope="col">Details</th></tr></thead>
+      <tbody>
+        <% @logs.each do |log| %>
+          <tr><td><%= log.created_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></td><td><%= log.model %></td><td><%= log.status || "Pending" %></td><td><%= log.duration_ms %> ms</td><td><%= log.usage&.fetch("total_tokens", nil) || "Not reported" %></td><td><details><summary>Attempts and request ID</summary><code><%= log.request_id %></code><pre><%= JSON.pretty_generate(log.attempts) %></pre></details></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Streaming usage is not collected. Failed or interrupted streams are never retried.</p>
+  <% if @logs.size == 50 %>
+    <%= link_to "Older requests", admin_path(before: @logs.last.id, model: params[:model], status: params[:status], anchor: "logs") %>
+  <% end %>
+</section>
