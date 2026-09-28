@@ -28,6 +28,16 @@
     <span class="stat-meta">Completed attempts</span>
   </div>
   <div class="stat-card">
+    <span class="stat-label">P95 Latency</span>
+    <strong class="stat-value"><%= @p95_latency %><small>ms</small></strong>
+    <span class="stat-meta">95th percentile (24h)</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Cache Hit %</span>
+    <strong class="stat-value"><%= @cache_hit_rate %><small>%</small></strong>
+    <span class="stat-meta"><%= @cache_hits %> of <%= @cache_total %> cached</span>
+  </div>
+  <div class="stat-card">
     <span class="stat-label">Active Routes</span>
     <strong class="stat-value"><%= @routes.size %></strong>
     <span class="stat-meta"><%= @providers.count(&:enabled?) %> of <%= @providers.size %> providers enabled</span>
@@ -40,6 +50,11 @@
       <h2 class="section-title" id="usage-heading">Token Usage by Model</h2>
       <p class="section-desc">All-time totals reported by upstream providers. Missing usage is recorded as zero, never estimated.</p>
     </div>
+    <% if @cache_total.positive? %>
+      <span class="pill-badge <%= @cache_hit_rate.positive? ? 'pill-success' : 'pill-neutral' %>" title="Requests served from the response cache in the last 24 hours">
+        <i class="dot" aria-hidden="true"></i>Cache <%= @cache_hit_rate %>% · <%= @cache_hits %> saved round-trips
+      </span>
+    <% end %>
   </div>
   <div class="table-container">
     <table class="data-table">

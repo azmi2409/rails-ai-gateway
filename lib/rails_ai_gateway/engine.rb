@@ -2,6 +2,7 @@ require "rails"
 require "active_record/railtie"
 require "action_controller/railtie"
 require "rails_ai_gateway/proxy"
+require "rails_ai_gateway/cache"
 
 module RailsAiGateway
   class Engine < ::Rails::Engine

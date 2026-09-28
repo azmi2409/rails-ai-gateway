@@ -19,6 +19,10 @@ module RailsAiGateway
       @requests = recent.count
       @errors = recent.where(status: 400..599).count
       @latency = recent.average(:duration_ms)&.round || 0
+      @cache_hits = recent.where(cached: true).count
+      @cache_total = @requests
+      @cache_hit_rate = @cache_total.zero? ? 0 : ((@cache_hits.to_f / @cache_total) * 100).round(1)
+      @p95_latency = p95_latency(recent)
       @model_usage = RequestLog.group(:model).order(:model).pluck(
         :model,
         Arel.sql("COALESCE(SUM(input_tokens), 0)"),
@@ -111,7 +115,7 @@ module RailsAiGateway
     def require_current_schema!
       missing = {
         ModelRoute => %w[system_prompt capabilities query_keywords],
-        RequestLog => %w[input_tokens output_tokens]
+        RequestLog => %w[input_tokens output_tokens cached cache_key]
       }.flat_map { |model, columns| columns.reject { |column| model.column_names.include?(column) } }
       return if missing.empty?
 
@@ -122,6 +126,14 @@ module RailsAiGateway
       response.headers["Cache-Control"] = "no-store"
       response.headers["Referrer-Policy"] = "same-origin"
       head :forbidden unless RailsAiGateway.configuration.admin_authorization.call(self) == true
+    end
+
+    # 95th percentile of request latency in milliseconds over the given scope.
+    def p95_latency(scope)
+      durations = scope.where.not(duration_ms: nil).order(:duration_ms).pluck(:duration_ms)
+      return 0 if durations.empty?
+
+      durations[((durations.size * 0.95).ceil - 1).clamp(0, durations.size - 1)]
     end
 
     def provider_params
