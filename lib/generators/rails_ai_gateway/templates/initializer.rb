@@ -14,4 +14,9 @@ RailsAIGateway.configure do |config|
   # Enable only for trusted internal providers, such as a local Ollama server.
   config.allow_private_networks = false
   config.allow_http = false
+
+  # Response cache for identical non-streaming requests (9router-lite).
+  # Disabled by default; enable to serve repeat calls from Rails.cache.
+  config.cache_enabled = false
+  config.cache_ttl = 3600 # Cache entry lifetime in seconds.
 end

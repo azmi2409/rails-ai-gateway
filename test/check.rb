@@ -32,12 +32,15 @@ require "#{ROOT}/db/migrate/20260920000000_create_rails_ai_gateway"
 require "#{ROOT}/db/migrate/20260921000000_add_prompts_and_token_counts_to_rails_ai_gateway"
 require "#{ROOT}/db/migrate/20260921010000_add_capabilities_to_rails_ai_gateway_model_routes"
 require "#{ROOT}/db/migrate/20260921020000_add_query_keywords_to_rails_ai_gateway_model_routes"
+require "#{ROOT}/db/migrate/20260922000000_add_cache_to_rails_ai_gateway"
 ActiveRecord::Migration.verbose = false
 CreateRailsAIGateway.new.migrate(:up)
 AddPromptsAndTokenCountsToRailsAIGateway.new.migrate(:up)
 AddCapabilitiesToRailsAIGatewayModelRoutes.new.migrate(:up)
 AddQueryKeywordsToRailsAIGatewayModelRoutes.new.migrate(:up)
+AddCacheToRailsAIGateway.new.migrate(:up)
 at_exit do
+  AddCacheToRailsAIGateway.new.migrate(:down)
   AddQueryKeywordsToRailsAIGatewayModelRoutes.new.migrate(:down)
   AddCapabilitiesToRailsAIGatewayModelRoutes.new.migrate(:down)
   AddPromptsAndTokenCountsToRailsAIGateway.new.migrate(:down)
@@ -114,6 +117,11 @@ assert(!config.admin_authorization.call(nil), "admin must default to denied")
 rejects("zero timeout accepted") { RailsAiGateway::Configuration.new.tap { |c| c.open_timeout = 0 }.validate! }
 rejects("fractional attempts accepted") { RailsAiGateway::Configuration.new.tap { |c| c.max_attempts = 1.5 }.validate! }
 rejects("truthy string accepted") { RailsAiGateway::Configuration.new.tap { |c| c.allow_http = "false" }.validate! }
+rejects("zero cache_ttl accepted") { RailsAiGateway::Configuration.new.tap { |c| c.cache_ttl = 0 }.validate! }
+rejects("truthy string cache_enabled accepted") { RailsAiGateway::Configuration.new.tap { |c| c.cache_enabled = "yes" }.validate! }
+assert(RailsAiGateway::Configuration.new.cache_enabled == false, "cache must default to disabled")
+assert(!RailsAiGateway::Cache.enabled?("chat/completions", { "model" => "chat" }), "cache enabled without configuration")
+assert(!RailsAiGateway::Cache.enabled?("models", { "model" => "chat" }), "models endpoint cacheable")
 
 provider = RailsAiGateway::Provider.create!(name: "Local", base_url: upstream.url, api_key: "fake-upstream-key")
 assert(!provider.api_key_before_type_cast.include?("fake-upstream-key"), "provider credential stored unencrypted")
@@ -161,6 +169,29 @@ log = RailsAiGateway::RequestLog.last
 assert(log.status == 200 && log.usage["total_tokens"] == 7 && log.input_tokens == 5 && log.output_tokens == 2 && log.attempts.size == 1, "usage/logging failed")
 assert(!log.attributes.to_json.include?("private prompt"), "prompt persisted")
 assert(!log.attributes.to_json.include?("Always answer precisely"), "system prompt persisted in request log")
+
+# Response cache: an identical non-streaming request is served from cache on repeat.
+upstream.received.clear
+config.cache_enabled = true
+config.cache_ttl = 3600
+cache_payload = { model: "chat", messages: [{ role: "user", content: "what is 2+2?" }] }
+upstream.respond(200, { choices: [{ message: { role: "assistant", content: "4" } }], usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 } })
+first = post.call(cache_payload)
+assert(first.status == 200 && first["x-cache"] == "MISS", "first request not a cache miss")
+assert(upstream.received.size == 1, "first request did not reach upstream")
+upstream.received.clear
+second = post.call(cache_payload)
+assert(second.status == 200 && second["x-cache"] == "HIT", "repeat request not a cache hit")
+assert(second.body == first.body, "cached body differs from upstream body")
+assert(upstream.received.empty?, "cache hit reached upstream")
+cache_log = RailsAiGateway::RequestLog.last
+assert(cache_log.cached && cache_log.cache_key.to_s.start_with?("rails_ai_gateway:"), "cache hit not logged")
+assert(cache_log.input_tokens == 5 && cache_log.output_tokens == 2, "cache hit usage not recorded")
+assert(RailsAiGateway::Cache.key("chat/completions", { "model" => "chat", "messages" => [] }) != RailsAiGateway::Cache.key("embeddings", { "model" => "chat", "messages" => [] }), "cache key ignores endpoint")
+assert(RailsAiGateway::Cache.key("chat/completions", { "model" => "chat", "stream" => false }) == RailsAiGateway::Cache.key("chat/completions", { "model" => "chat" }), "cache key not stable across stream flag")
+assert(!RailsAiGateway::Cache.enabled?("chat/completions", { "model" => "chat", "stream" => true }), "streamed request marked cacheable")
+assert(RailsAiGateway::Cache.key("chat/completions", { "model" => "chat", "user" => "someone-else" }) == RailsAiGateway::Cache.key("chat/completions", { "model" => "chat" }), "variable user field changed cache key")
+config.cache_enabled = false
 
 vision_payload = payload.merge(messages: [{ role: "user", content: [
   { type: "text", text: "Describe this" },

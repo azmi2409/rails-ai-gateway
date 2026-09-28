@@ -23,6 +23,10 @@ module RailsAiGateway
     attr_accessor :allow_private_networks
     # @return [Boolean] whether upstream providers may use unencrypted HTTP
     attr_accessor :allow_http
+    # @return [Boolean] whether identical non-streaming responses are served from cache
+    attr_accessor :cache_enabled
+    # @return [Integer] cache entry lifetime in seconds
+    attr_accessor :cache_ttl
 
     def initialize
       @admin_controller = "ActionController::Base"
@@ -36,6 +40,8 @@ module RailsAiGateway
       @max_attempts = 3
       @allow_private_networks = false
       @allow_http = false
+      @cache_enabled = false
+      @cache_ttl = 3600
     end
 
     # Validates all settings.
@@ -50,7 +56,8 @@ module RailsAiGateway
         value = public_send(name)
         raise ArgumentError, "#{name} must be a positive integer" unless value.is_a?(Integer) && value.positive?
       end
-      %i[allow_private_networks allow_http].each do |name|
+      raise ArgumentError, "cache_ttl must be a positive integer" unless cache_ttl.is_a?(Integer) && cache_ttl.positive?
+      %i[allow_private_networks allow_http cache_enabled].each do |name|
         raise ArgumentError, "#{name} must be boolean" unless [true, false].include?(public_send(name))
       end
       raise ArgumentError, "admin_authorization must be callable" unless admin_authorization.respond_to?(:call)

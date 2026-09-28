@@ -76,11 +76,16 @@ module RailsAiGateway
       routes = ModelRoute.ranked_for_query(name: payload["model"], query: query_text(payload), capabilities: required_capabilities(payload)).first(config.max_attempts)
       return error("No route for requested model", 404) if routes.empty?
 
-      log = RequestLog.create!(request_id: SecureRandom.uuid, gateway_key: key, model: payload["model"], endpoint: @endpoint)
+      log = RequestLog.create!(request_id: SecureRandom.uuid, gateway_key: key, model: payload["model"], endpoint: @endpoint, cached: false)
       if payload["stream"]
         stream_response(routes, payload, log.id, log.request_id)
       else
-        perform(routes, payload, log.id, log.request_id)
+        cache_key = Cache.key(@endpoint, payload) if Cache.enabled?(@endpoint, payload)
+        if cache_key && (entry = Cache.read(cache_key))
+          cached_response(log, entry, cache_key)
+        else
+          perform(routes, payload, log.id, log.request_id, cache_key: cache_key)
+        end
       end
     rescue JSON::ParserError
       error("Invalid JSON", 400)
@@ -217,7 +222,26 @@ module RailsAiGateway
       raise
     end
 
-    def perform(routes, payload, log_id, request_id)
+    # Serves a cached upstream response without touching providers. The request
+    # log records the hit so cache performance stays visible in the admin UI.
+    def cached_response(log, entry, cache_key)
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      usage = entry["usage"]
+      duration = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+      log.update!(
+        status: 200,
+        duration_ms: duration,
+        attempts: [{ "cache" => "hit" }],
+        usage: usage,
+        input_tokens: usage&.fetch("input_tokens", 0) || 0,
+        output_tokens: usage&.fetch("output_tokens", 0) || 0,
+        cached: true,
+        cache_key: cache_key
+      )
+      [200, { "content-type" => "application/json", "cache-control" => "no-store", "x-request-id" => log.request_id, "x-cache" => "HIT" }, [entry["body"]]]
+    end
+
+    def perform(routes, payload, log_id, request_id, cache_key: nil)
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       attempts, usage, status, streaming = [], nil, 502, false
       Timeout.timeout(config.request_timeout, Failure, "Upstream deadline exceeded") do
@@ -271,7 +295,8 @@ module RailsAiGateway
                     usage = normalize_usage(parsed["usage"]) if parsed["usage"].is_a?(Hash)
                     if (200..299).cover?(status)
                       raise Failure, "Upstream embeddings response is malformed" if @endpoint == "embeddings" && !parsed["data"].is_a?(Array)
-                      result = [status, headers, [body]]
+                      Cache.write(cache_key, body: body, usage: usage) if cache_key
+                      result = [status, headers.merge("x-cache" => "MISS"), [body]]
                     else
                       message = parsed.dig("error", "message") || parsed["message"] || parsed["error"]
                       message = "Upstream request failed" unless message.is_a?(String) && message.present?
