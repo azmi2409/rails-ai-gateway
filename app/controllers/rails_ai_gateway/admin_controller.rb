@@ -115,7 +115,7 @@ module RailsAiGateway
     def require_current_schema!
       missing = {
         ModelRoute => %w[system_prompt capabilities query_keywords],
-        RequestLog => %w[input_tokens output_tokens cached cache_key]
+        RequestLog => %w[input_tokens output_tokens cached response_cache_key]
       }.flat_map { |model, columns| columns.reject { |column| model.column_names.include?(column) } }
       return if missing.empty?
 

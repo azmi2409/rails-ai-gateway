@@ -16,6 +16,7 @@ metadata with ActiveRecord, and includes a Web UI for providers, model routes, a
 - Encrypted provider API keys using ActiveRecord encryption
 - Scoped gateway keys stored as SHA-256 digests
 - Request status, latency, attempt, and reported token-usage logs
+- Response cache hits recorded as `cached` and `response_cache_key` on request logs
 - Durable input/output token totals grouped by public model
 - Optional system prompt injection configured per model route
 - One-key provider templates for OpenAI, OpenRouter, Groq, DeepSeek, Mistral, Cerebras,

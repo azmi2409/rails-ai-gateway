@@ -169,6 +169,7 @@ log = RailsAiGateway::RequestLog.last
 assert(log.status == 200 && log.usage["total_tokens"] == 7 && log.input_tokens == 5 && log.output_tokens == 2 && log.attempts.size == 1, "usage/logging failed")
 assert(!log.attributes.to_json.include?("private prompt"), "prompt persisted")
 assert(!log.attributes.to_json.include?("Always answer precisely"), "system prompt persisted in request log")
+assert(!log.cached && log.response_cache_key.nil?, "uncached request recorded a response cache key")
 
 # Response cache: an identical non-streaming request is served from cache on repeat.
 upstream.received.clear
@@ -185,7 +186,8 @@ assert(second.status == 200 && second["x-cache"] == "HIT", "repeat request not a
 assert(second.body == first.body, "cached body differs from upstream body")
 assert(upstream.received.empty?, "cache hit reached upstream")
 cache_log = RailsAiGateway::RequestLog.last
-assert(cache_log.cached && cache_log.cache_key.to_s.start_with?("rails_ai_gateway:"), "cache hit not logged")
+assert(cache_log.cached && cache_log.response_cache_key.to_s.start_with?("rails_ai_gateway:"), "cache hit not logged")
+assert(cache_log.response_cache_key == RailsAiGateway::Cache.key("chat/completions", JSON.parse(JSON.generate(cache_payload))), "cache hit logged the wrong response cache key")
 assert(cache_log.input_tokens == 5 && cache_log.output_tokens == 2, "cache hit usage not recorded")
 assert(RailsAiGateway::Cache.key("chat/completions", { "model" => "chat", "messages" => [] }) != RailsAiGateway::Cache.key("embeddings", { "model" => "chat", "messages" => [] }), "cache key ignores endpoint")
 assert(RailsAiGateway::Cache.key("chat/completions", { "model" => "chat", "stream" => false }) == RailsAiGateway::Cache.key("chat/completions", { "model" => "chat" }), "cache key not stable across stream flag")
