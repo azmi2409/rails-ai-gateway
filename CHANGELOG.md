@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Fix the response-cache migration class name to respect the `AI` acronym.
+- Store request-log cache keys in `response_cache_key` to avoid ActiveRecord's reserved `cache_key` method.
+
 ## 0.3.0 - 2026-09-21
 
 - Add durable input/output token totals grouped by public model.

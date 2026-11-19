@@ -236,7 +236,7 @@ module RailsAiGateway
         input_tokens: usage&.fetch("input_tokens", 0) || 0,
         output_tokens: usage&.fetch("output_tokens", 0) || 0,
         cached: true,
-        cache_key: cache_key
+        response_cache_key: cache_key
       )
       [200, { "content-type" => "application/json", "cache-control" => "no-store", "x-request-id" => log.request_id, "x-cache" => "HIT" }, [entry["body"]]]
     end
